@@ -233,7 +233,7 @@
 /obj/item/weapon/tank/process()
 	//Allow for reactions
 	if(air_contents)
-		air_contents.react()
+		air_contents.reactd()
 	check_status()
 
 
@@ -254,14 +254,16 @@
 			log_game("Explosive tank rupture! last key to touch the tank was [src.fingerprintslast].")
 //		to_chat(world, "<span class='warning'>[x],[y] tank is exploding: [pressure] kPa</span>")
 		//Give the gas a chance to build up more pressure through reacting
-		air_contents.react()
-		air_contents.react()
-		air_contents.react()
+		air_contents.reactd()
+		air_contents.reactd()
+		air_contents.reactd()
 		pressure = air_contents.return_pressure()
 		var/range = (pressure-TANK_FRAGMENT_PRESSURE)/TANK_FRAGMENT_SCALE
 		if(range > MAX_EXPLOSION_RANGE)
 			cap = 1
 			uncapped = range
+			to_chat(world, "<span class='notice'>Dev [range]</span>")
+
 		range = min(range, MAX_EXPLOSION_RANGE)		// was 8 - - - Changed to a configurable define -- TLE
 		var/turf/epicenter = get_turf(loc)
 
@@ -289,12 +291,14 @@
 				return
 			T.assume_air(air_contents)
 			playsound(get_turf(src), 'sound/effects/spray.ogg', 10, 1, -3)
+			to_chat(world, "<span class='notice'>Tank rupturedd</span>")
 
 			qdel(src)
 
 			return
 		else
 			integrity--
+			to_chat(world, "<span class='notice'>Tank rupturing, ingregrity at [integrity]</span>")
 
 	else if(pressure > TANK_LEAK_PRESSURE)
 //		to_chat(world, "<span class='warning'>[x],[y] tank is leaking: [pressure] kPa, integrity [integrity]</span>")
@@ -304,8 +308,11 @@
 				return
 			var/datum/gas_mixture/leaked_gas = air_contents.remove_ratio(0.25)
 			T.assume_air(leaked_gas)
+			to_chat(world, "<span class='notice'>Tank leaked</span>")
 		else
 			integrity--
+			to_chat(world, "<span class='notice'>Tank leaking, integrity at [integrity]</span>")
 
 	else if(integrity < 3)
 		integrity++
+		to_chat(world, "<span class='notice'>Tank recovering, integrity at [integrity]</span>")

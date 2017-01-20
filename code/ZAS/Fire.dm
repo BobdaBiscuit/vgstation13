@@ -311,7 +311,6 @@ datum/gas_mixture/proc/zburn(var/turf/T, force_burn)
 
 		//determine the amount of reactants actually reacting
 		var/used_reactants_ratio = Clamp(total_reactants * firelevel / zas_settings.Get(/datum/ZAS_Setting/fire_firelevel_multiplier), 0.2, total_reactants) / total_reactants
-
 		//remove and add gasses as calculated
 		oxygen -= min(oxygen, total_oxygen * used_reactants_ratio )
 
@@ -337,19 +336,108 @@ datum/gas_mixture/proc/zburn(var/turf/T, force_burn)
 		//calculate the energy produced by the reaction and then set the new temperature of the mix
 		temperature = (starting_energy + zas_settings.Get(/datum/ZAS_Setting/fire_fuel_energy_release) * total_fuel) / heat_capacity()
 
-		update_values()
+		update_valuesd()
 		value = total_reactants * used_reactants_ratio
 	return value
 
+datum/gas_mixture/proc/zburnd(var/turf/T, force_burn)
+	// NOTE: zburn is also called from canisters and in tanks/pipes (via react()).  Do NOT assume T is always a turf.
+	//  In the aforementioned cases, it's null. - N3X.
+	var/value = 0
+
+	if((temperature > PLASMA_MINIMUM_BURN_TEMPERATURE || force_burn) && check_recombustability(T))
+		to_chat(world, "<span class='notice'>zburn conditions passed</span>")
+		var/total_fuel = 0
+		var/datum/gas/volatile_fuel/fuel = locate() in trace_gases
+
+		total_fuel += toxins
+		to_chat(world, "<span class='notice'>total_fuel = [total_fuel]</span>")
+
+		if(fuel)
+		//Volatile Fuel
+			total_fuel += fuel.moles
+
+		var/can_use_turf=(T && istype(T))
+		if(can_use_turf)
+			for(var/atom/A in T)
+				if(!A)
+					continue
+				total_fuel += A.getFireFuel()
+
+		if (0 == total_fuel) // Fix zburn /0 runtime
+			//testing("zburn: No fuel left.")
+			to_chat(world, "<span class='notice'>zburn: No fuel left</span>")
+			return 0
+
+		//Calculate the firelevel.
+		var/firelevel = calculate_firelevel(T)
+
+		//get the current inner energy of the gas mix
+		//this must be taken here to prevent the addition or deletion of energy by a changing heat capacity
+		var/starting_energy = temperature * heat_capacityd()
+		to_chat(world, "<span class='notice'>starting_energy = [starting_energy]</span>")
+
+		//determine the amount of oxygen used
+		var/total_oxygen = min(oxygen, 2 * total_fuel)
+		to_chat(world, "<span class='notice'>total_oxygen = [total_oxygen]</span>")
+
+		//determine the amount of fuel actually used
+		var/used_fuel_ratio = min(oxygen / 2 , total_fuel) / total_fuel
+		total_fuel = total_fuel * used_fuel_ratio
+		to_chat(world, "<span class='notice'>used fuel ratio = [used_fuel_ratio]</span>")
+		to_chat(world, "<span class='notice'>total_fuel_final = [total_fuel]</span>")
+
+		var/total_reactants = total_fuel + total_oxygen
+		to_chat(world, "<span class='notice'>total_reactants = [total_reactants]</span>")
+
+		//determine the amount of reactants actually reacting
+		var/used_reactants_ratio = Clamp(total_reactants * firelevel / zas_settings.Get(/datum/ZAS_Setting/fire_firelevel_multiplier), 0.2, total_reactants) / total_reactants
+		to_chat(world, "<span class='notice'>used_reactants_ratio [used_reactants_ratio]</span>")
+
+		//remove and add gasses as calculated
+		oxygen -= min(oxygen, total_oxygen * used_reactants_ratio )
+
+		toxins -= min(toxins, (toxins * used_fuel_ratio * used_reactants_ratio ) * 3)
+		if(toxins < 0)
+			toxins = 0
+
+		carbon_dioxide += max(2 * total_fuel, 0)
+
+		if(fuel)
+			fuel.moles -= (fuel.moles * used_fuel_ratio * used_reactants_ratio) * 5 //Fuel burns 5 times as quick
+			if(fuel.moles <= 0)
+				qdel (fuel)
+				fuel = null
+
+		if(can_use_turf)
+			if(T.getFireFuel()>0)
+				T.burnFireFuel(used_fuel_ratio, used_reactants_ratio)
+			for(var/atom/A in T)
+				if(A.getFireFuel()>0)
+					A.burnFireFuel(used_fuel_ratio, used_reactants_ratio)
+
+		//calculate the energy produced by the reaction and then set the new temperature of the mix
+		to_chat(world, "<span class='notice'>Old temp = [temperature]</span>")
+		temperature = (starting_energy + zas_settings.Get(/datum/ZAS_Setting/fire_fuel_energy_release) * total_fuel) / heat_capacityd()
+		to_chat(world, "<span class='notice'>New temp = [temperature]</span>")
+
+		update_valuesd()
+		value = total_reactants * used_reactants_ratio
+	return value
+
+
 /datum/gas_mixture/proc/check_recombustability(var/turf/T)
 	//this is a copy proc to continue a fire after its been started.
+
 
 	var/datum/gas/volatile_fuel/fuel = locate() in trace_gases
 
 	if(oxygen && (toxins || fuel))
 		if(QUANTIZE(toxins * zas_settings.Get(/datum/ZAS_Setting/fire_consumption_rate)) >= MOLES_PLASMA_VISIBLE)
+			to_chat(world, "<span class='notice'>Check recombustibility PASSED</span>")
 			return 1
 		if(fuel && QUANTIZE(fuel.moles * zas_settings.Get(/datum/ZAS_Setting/fire_consumption_rate)) >= BASE_ZAS_FUEL_REQ)
+			to_chat(world, "<span class='notice'>Check recombustibility PASSED</span>")
 			return 1
 
 	// Check if we're actually in a turf or not before trying to check object fires.
@@ -411,6 +499,8 @@ datum/gas_mixture/proc/calculate_firelevel(var/turf/T)
 	var/datum/gas/volatile_fuel/fuel = locate() in trace_gases
 	var/total_fuel = 0
 	var/firelevel = 0
+	to_chat(world, "<span class='notice'>calculate firelevel called</span>")
+
 
 	if(check_recombustability(T))
 
@@ -436,6 +526,8 @@ datum/gas_mixture/proc/calculate_firelevel(var/turf/T)
 			var/mix_multiplier = 1 / (1 + (5 * ((oxygen / total_combustables) ** 2))) // Thanks, Mloc
 			//toss everything together
 			firelevel = zas_settings.Get(/datum/ZAS_Setting/fire_firelevel_multiplier) * mix_multiplier * dampening_multiplier
+
+	to_chat(world, "<span class='notice'>Firelevel = [firelevel]</span>")
 
 	return max( 0, firelevel)
 

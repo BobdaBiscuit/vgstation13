@@ -197,12 +197,16 @@
 			environment = loc.return_air()
 
 		var/env_pressure = environment.return_pressure()
+		to_chat(world, "<span class='notice'>kpa = [release_pressure]</span>")
+		to_chat(world, "<span class='notice'>env_pressure = [env_pressure]</span>")
 		var/pressure_delta = min(release_pressure - env_pressure, (air_contents.return_pressure() - env_pressure)/2)
+		to_chat(world, "<span class='notice'>Pressure delta = [pressure_delta]</span>")
 		//Can not have a pressure delta that would cause environment pressure > tank pressure
 
 		var/transfer_moles = 0
 		if((air_contents.temperature > 0) && (pressure_delta > 0))
 			transfer_moles = pressure_delta*environment.volume/(air_contents.temperature * R_IDEAL_GAS_EQUATION)
+			to_chat(world, "<span class='notice'>transfer_moles = [transfer_moles]</span>")
 
 			//Actually transfer the gas
 			var/datum/gas_mixture/removed = air_contents.remove(transfer_moles)

@@ -178,7 +178,21 @@ What are the archived variables for?
 	if(trace_gases && trace_gases.len) //sanity check because somehow the tracegases gets nulled?
 		for(var/datum/gas/trace_gas in trace_gases)
 			heat_capacity += trace_gas.moles*trace_gas.specific_heat
+	return max(MINIMUM_HEAT_CAPACITY,heat_capacity)
 
+/datum/gas_mixture/proc/heat_capacityd()
+	//Purpose: Returning the heat capacity of the gas mix
+	//Called by: UNKNOWN
+	//Inputs: None
+	//Outputs: Heat capacity
+
+	to_chat(world, "<span class='notice'>Heatcapacity called</span>")
+	var/heat_capacity = HEAT_CAPACITY_CALCULATION(oxygen,carbon_dioxide,nitrogen,toxins)
+
+	if(trace_gases && trace_gases.len) //sanity check because somehow the tracegases gets nulled?
+		for(var/datum/gas/trace_gas in trace_gases)
+			heat_capacity += trace_gas.moles*trace_gas.specific_heat
+	to_chat(world, "<span class='notice'>Heatcapacity = [heat_capacity]</span>")
 	return max(MINIMUM_HEAT_CAPACITY,heat_capacity)
 
 /datum/gas_mixture/proc/heat_capacity_archived()
@@ -256,6 +270,33 @@ What are the archived variables for?
 
 	return
 
+/datum/gas_mixture/proc/update_valuesd()
+	//Purpose: Calculating and storing values which were normally called CONSTANTLY
+	//Called by: Anything that changes values within a gas mix.
+	//Inputs: None
+	//Outputs: None
+
+	total_moles = oxygen + carbon_dioxide + nitrogen + toxins
+	to_chat(world, "<span class='notice'>update_values called</span>")
+	to_chat(world, "<span class='notice'>Inputs: Oxygen [oxygen] Toxin [toxins] CO2 [carbon_dioxide] Pressure [pressure]</span>")
+
+	if(trace_gases.len)
+		for(var/datum/gas/trace_gas in trace_gases)
+			total_moles += trace_gas.moles
+
+/*
+	if(aerosols.total_volume)
+		total_moles += aerosols.total_volume
+*/
+
+	if(volume>0)
+		pressure = total_moles()*R_IDEAL_GAS_EQUATION*temperature/volume
+	else
+		pressure = 0
+
+	to_chat(world, "<span class='notice'>Output: Oxygen [oxygen] Toxin [toxins] CO2 [carbon_dioxide] Pressure [pressure]</span>")
+	return
+
 ////////////////////////////////////////////
 //Procedures used for very specific events//
 ////////////////////////////////////////////
@@ -299,6 +340,16 @@ What are the archived variables for?
 	 //set to 1 if a notable reaction occured (used by pipe_network)
 
 	return zburn(null) // ? (was: return reacting)
+
+/datum/gas_mixture/proc/reactd(atom/dump_location)
+	//Purpose: Calculating if it is possible for a fire to occur in the airmix
+	//Called by: Air mixes updating?
+	//Inputs: None
+	//Outputs: If a fire occured
+
+	 //set to 1 if a notable reaction occured (used by pipe_network)
+
+	return zburnd(null) // ? (was: return reacting)
 
 /datum/gas_mixture/proc/fire()
 	//Purpose: Calculating any fire reactions.
